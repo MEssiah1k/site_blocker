@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网站拦截</title>
+  <link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+  <div class="container">
+    <h1 class="blocked-title">访问已被拦截</h1>
+
+    <div id="block-info">
+      <p>你正在尝试访问：<strong id="blocked-domain"></strong></p>
+      <p>拦截等级：<span id="blocked-level" class="level-badge"></span></p>
+    </div>
+
+    <div id="level0-message" class="hidden">
+      <p class="permanent-block">此网站已被永久禁止访问，无法申请临时使用。</p>
+    </div>
+
+    <div id="application-form" class="hidden">
+      <p class="form-desc">如果确实需要使用，请在下方申请临时访问。</p>
+      <p class="warning">申请时间越长，需要手动输入的验证码越长。</p>
+
+      <div class="form-step">
+        <label for="request-minutes" id="minutes-label">申请时长（分钟）：</label>
+        <input type="number" id="request-minutes" min="5" step="1" value="5">
+        <p id="captcha-preview" class="preview"></p>
+        <button id="generate-captcha-btn">生成验证码</button>
+      </div>
+
+      <div id="captcha-section" class="hidden">
+        <div class="captcha-display">
+          <p>请手动输入以下验证码：</p>
+          <code id="captcha-text"></code>
+        </div>
+        <div class="captcha-input-area">
+          <label for="captcha-input">输入验证码：</label>
+          <input type="text" id="captcha-input"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <p id="paste-warning" class="hidden warning-inline">验证码必须手动输入，禁止粘贴。</p>
+        </div>
+        <button id="submit-captcha-btn">确认申请</button>
+      </div>
+
+      <div id="error-message" class="hidden"></div>
+    </div>
+
+    <div id="error-state" class="hidden">
+      <p>无法获取拦截信息。</p>
+      <button id="go-back-btn">返回</button>
+    </div>
+  </div>
+
+  <script type="module" src="blocked.js"></script>
+</body>
+</html>

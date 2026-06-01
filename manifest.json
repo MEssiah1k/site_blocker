@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Site Blocker",
+  "version": "0.1.0",
+  "description": "Self-discipline site blocker — blocks specified websites and requires captcha for temporary access",
+  "permissions": [
+    "storage",
+    "webNavigation",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "src/pages/popup/popup.html",
+    "default_title": "Site Blocker"
+  }
+}

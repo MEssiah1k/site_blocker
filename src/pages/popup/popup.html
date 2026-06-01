@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Blocker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Site Blocker</h1>
+
+    <div id="rule-form">
+      <div class="form-title-row">
+        <h2 id="form-title">添加规则</h2>
+        <button id="add-current-btn">添加当前网站</button>
+      </div>
+      <div class="form-group">
+        <label for="domain-input">域名：</label>
+        <input type="text" id="domain-input" placeholder="例如 youtube.com">
+        <p id="domain-preview" class="preview"></p>
+      </div>
+      <div class="form-group">
+        <label for="level-select">拦截等级：</label>
+        <select id="level-select">
+          <option value="0">等级 0 — 完全禁止</option>
+          <option value="1" selected>等级 1 — 受控使用</option>
+          <option value="2">等级 2 — 偶尔使用</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="note-input">备注（可选）：</label>
+        <input type="text" id="note-input" placeholder="例如 视频网站">
+      </div>
+      <div class="form-actions">
+        <button id="save-btn" class="btn-primary">保存</button>
+        <button id="cancel-btn" class="btn-secondary hidden">取消</button>
+      </div>
+      <div id="form-error" class="hidden"></div>
+    </div>
+
+    <div id="rule-list">
+      <div class="rule-list-header">
+        <h2>规则列表</h2>
+        <button id="unlock-btn" class="btn-unlock">解锁管理</button>
+        <span id="unlock-status" class="unlocked-badge hidden">已解锁</span>
+      </div>
+
+      <!-- 解锁验证区域 -->
+      <div id="unlock-panel" class="hidden">
+        <p class="unlock-desc">请对每个字母进行转换：先翻转大小写，再在字母表中后移 2 位。</p>
+        <div class="captcha-display">
+          <code id="rule-captcha-text"></code>
+        </div>
+        <div class="unlock-input-area">
+          <input type="text" id="rule-captcha-input" placeholder="输入转换后的文本"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <p id="rule-paste-warning" class="hidden warning-inline">必须手动输入，禁止粘贴。</p>
+        </div>
+        <div class="unlock-actions">
+          <button id="confirm-unlock-btn" class="btn-primary">确认</button>
+          <button id="cancel-unlock-btn" class="btn-secondary">取消</button>
+        </div>
+        <p id="captcha-error" class="hidden"></p>
+      </div>
+
+      <div id="rules-container"></div>
+      <p id="no-rules" class="hidden empty-msg">暂无规则，请在上方添加。</p>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
