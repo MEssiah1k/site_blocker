@@ -1,7 +1,6 @@
-import { normalizeDomain } from '../../lib/domain.js';
 import { calculateCaptchaLength, generateCaptcha } from '../../lib/captcha.js';
 import { getRules, setTemporaryAccess } from '../../lib/storage.js';
-import { LEVEL_LABELS, CAPTCHA_L1_MAX_MINUTES, CAPTCHA_L2_MAX_MINUTES } from '../../lib/constants.js';
+import { getConfig } from '../../lib/config.js';
 
 const params = new URLSearchParams(window.location.search);
 const targetUrl = params.get('target');
@@ -9,6 +8,7 @@ const domainParam = params.get('domain');
 
 let currentCaptcha = null;
 let currentRule = null;
+let currentConfig = null;
 
 const blockedDomainEl = document.getElementById('blocked-domain');
 const blockedLevelEl = document.getElementById('blocked-level');
@@ -27,6 +27,17 @@ const errorMessage = document.getElementById('error-message');
 const errorState = document.getElementById('error-state');
 const goBackBtn = document.getElementById('go-back-btn');
 
+function getLevelColor(levelKey) {
+  if (currentConfig?.levels[String(levelKey)]?.color) {
+    return currentConfig.levels[String(levelKey)].color;
+  }
+  // Derive a color from level key
+  const predefined = { 0: '#c0392b', 1: '#e67e22', 2: '#f1c40f' };
+  if (predefined[levelKey]) return predefined[levelKey];
+  const hue = (parseInt(levelKey, 10) * 67) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+}
+
 async function init() {
   if (!targetUrl) {
     showError();
@@ -39,6 +50,7 @@ async function init() {
     return;
   }
 
+  currentConfig = await getConfig();
   const rules = await getRules();
   currentRule = rules.find(r => r.domain === domain && r.enabled) || null;
 
@@ -47,19 +59,51 @@ async function init() {
     return;
   }
 
-  blockedDomainEl.textContent = currentRule.domain;
-  blockedLevelEl.textContent = LEVEL_LABELS[currentRule.level];
-  blockedLevelEl.classList.add(`level-${currentRule.level}`);
+  const levelConf = currentConfig.levels[String(currentRule.level)];
+  if (!levelConf) {
+    showError('配置中不存在该等级');
+    return;
+  }
 
-  if (currentRule.level === 0) {
+  blockedDomainEl.textContent = currentRule.domain;
+  blockedLevelEl.textContent = levelConf.label;
+  blockedLevelEl.style.background = getLevelColor(currentRule.level);
+  const isDark = isColorDark(getLevelColor(currentRule.level));
+  blockedLevelEl.style.color = isDark ? '#fff' : '#333';
+
+  if (!levelConf.allowTempAccess) {
     level0Message.classList.remove('hidden');
   } else {
-    const maxMin = currentRule.level === 1 ? CAPTCHA_L1_MAX_MINUTES : CAPTCHA_L2_MAX_MINUTES;
-    minutesLabel.textContent = `申请时长（分钟，5 ~ ${maxMin}）：`;
+    const maxMin = levelConf.maxMinutes;
+    minutesLabel.textContent = `申请时长（分钟，${currentConfig.minRequestMinutes} ~ ${maxMin}）：`;
+    requestMinutes.min = currentConfig.minRequestMinutes;
+    requestMinutes.value = currentConfig.minRequestMinutes;
     applicationForm.classList.remove('hidden');
     updateCaptchaPreview();
-    generateCaptchaForMinutes(5);
+    generateCaptchaForMinutes(currentConfig.minRequestMinutes);
   }
+}
+
+function isColorDark(color) {
+  // Simple check for hex and hsl colors
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length >= 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+    }
+  }
+  if (color.startsWith('hsl')) {
+    const match = color.match(/hsl\(\s*(\d+)/);
+    if (match) {
+      const hue = parseInt(match[1], 10);
+      // Dark for reds, dark for most saturated colors
+      return hue < 60 || hue > 300;
+    }
+  }
+  return false;
 }
 
 function extractDomainFromUrl(url) {
@@ -71,33 +115,30 @@ function extractDomainFromUrl(url) {
 }
 
 function updateCaptchaPreview() {
+  if (!currentRule || !currentConfig) return;
+
   const minutes = parseInt(requestMinutes.value, 10);
-  if (isNaN(minutes) || minutes < 5) {
+  if (isNaN(minutes) || minutes < currentConfig.minRequestMinutes) {
     captchaPreview.textContent = '';
     return;
   }
 
-  const maxMin = currentRule.level === 1 ? CAPTCHA_L1_MAX_MINUTES : CAPTCHA_L2_MAX_MINUTES;
-  if (minutes > maxMin) {
-    captchaPreview.textContent = `最长可申请 ${maxMin} 分钟。`;
+  const levelConf = currentConfig.levels[String(currentRule.level)];
+  if (!levelConf || !levelConf.allowTempAccess) return;
+
+  if (minutes > levelConf.maxMinutes) {
+    captchaPreview.textContent = `最长可申请 ${levelConf.maxMinutes} 分钟。`;
     captchaPreview.classList.add('preview-error');
     return;
   }
 
-  if (isNaN(parseInt(requestMinutes.value, 10))) {
-    captchaPreview.textContent = '请输入有效的整数分钟数。';
-    captchaPreview.classList.add('preview-error');
-    return;
-  }
-
-  try {
-    const length = calculateCaptchaLength(currentRule.level, minutes);
+  calculateCaptchaLength(currentRule.level, minutes).then(length => {
     captchaPreview.textContent = `需要输入 ${length} 位验证码。`;
     captchaPreview.classList.remove('preview-error');
-  } catch (e) {
+  }).catch(e => {
     captchaPreview.textContent = e.message;
     captchaPreview.classList.add('preview-error');
-  }
+  });
 }
 
 function showError(msg) {
@@ -117,10 +158,10 @@ function hideFormError() {
   errorMessage.classList.add('hidden');
 }
 
-function generateCaptchaForMinutes(minutes) {
+async function generateCaptchaForMinutes(minutes) {
   try {
-    const length = calculateCaptchaLength(currentRule.level, minutes);
-    currentCaptcha = generateCaptcha(length);
+    const length = await calculateCaptchaLength(currentRule.level, minutes);
+    currentCaptcha = await generateCaptcha(length);
     captchaText.textContent = currentCaptcha;
     captchaSection.classList.remove('hidden');
     captchaInput.value = '';
@@ -138,6 +179,8 @@ requestMinutes.addEventListener('change', tryGenerateCaptcha);
 requestMinutes.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryGenerateCaptcha(); });
 
 function tryGenerateCaptcha() {
+  if (!currentRule || !currentConfig) return;
+
   const raw = requestMinutes.value.trim();
   const minutes = parseInt(raw, 10);
 
@@ -147,15 +190,17 @@ function tryGenerateCaptcha() {
     return;
   }
 
-  if (minutes < 5) {
-    captchaPreview.textContent = '请输入至少 5 分钟。';
+  const levelConf = currentConfig.levels[String(currentRule.level)];
+  if (!levelConf) return;
+
+  if (minutes < currentConfig.minRequestMinutes) {
+    captchaPreview.textContent = `请输入至少 ${currentConfig.minRequestMinutes} 分钟。`;
     captchaPreview.classList.add('preview-error');
     return;
   }
 
-  const maxMin = currentRule.level === 1 ? CAPTCHA_L1_MAX_MINUTES : CAPTCHA_L2_MAX_MINUTES;
-  if (minutes > maxMin) {
-    captchaPreview.textContent = `最长可申请 ${maxMin} 分钟。`;
+  if (minutes > levelConf.maxMinutes) {
+    captchaPreview.textContent = `最长可申请 ${levelConf.maxMinutes} 分钟。`;
     captchaPreview.classList.add('preview-error');
     return;
   }

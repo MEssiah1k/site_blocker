@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Blocker 配置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Site Blocker 配置</h1>
+    <p class="subtitle">自定义拦截等级、验证码公式和字符集等行为参数。修改配置后点击"验证"检查，确认无误后"保存"。</p>
+
+    <div class="editor-section">
+      <label for="config-editor">配置 JSON：</label>
+      <textarea id="config-editor" spellcheck="false"></textarea>
+    </div>
+
+    <div class="action-bar">
+      <button id="validate-btn" class="btn-action btn-validate">验证</button>
+      <button id="save-btn" class="btn-action btn-save">保存</button>
+      <button id="reset-btn" class="btn-action btn-reset">重置默认</button>
+      <button id="import-btn" class="btn-action btn-import">导入文件</button>
+      <button id="export-btn" class="btn-action btn-export">导出文件</button>
+      <button id="preview-btn" class="btn-action btn-preview">预览公式</button>
+      <input type="file" id="file-input" accept=".json" class="hidden">
+    </div>
+
+    <div id="feedback" class="hidden"></div>
+
+    <div id="preview-panel" class="hidden">
+      <h2>公式预览</h2>
+      <div class="preview-controls">
+        <label for="preview-level">选择等级：</label>
+        <select id="preview-level"></select>
+        <label for="preview-minutes">申请时长（分钟）：</label>
+        <input type="number" id="preview-minutes" min="1" value="5">
+        <button id="preview-calc-btn" class="btn-action btn-validate">计算</button>
+      </div>
+      <div id="preview-result"></div>
+      <div id="preview-table-container"></div>
+    </div>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

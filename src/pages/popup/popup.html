@@ -23,9 +23,7 @@
       <div class="form-group">
         <label for="level-select">拦截等级：</label>
         <select id="level-select">
-          <option value="0">等级 0 — 完全禁止</option>
-          <option value="1" selected>等级 1 — 受控使用</option>
-          <option value="2">等级 2 — 偶尔使用</option>
+          <option value="" disabled selected>加载中...</option>
         </select>
       </div>
       <div class="form-group">
@@ -66,6 +64,10 @@
 
       <div id="rules-container"></div>
       <p id="no-rules" class="hidden empty-msg">暂无规则，请在上方添加。</p>
+
+      <div class="options-link-row">
+        <a href="#" id="open-options-btn">高级配置</a>
+      </div>
     </div>
   </div>
 

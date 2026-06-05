@@ -19,5 +19,6 @@
   "action": {
     "default_popup": "src/pages/popup/popup.html",
     "default_title": "Site Blocker"
-  }
+  },
+  "options_page": "src/pages/options/options.html"
 }

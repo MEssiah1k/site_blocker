@@ -1,4 +1,5 @@
-import { STORAGE_KEYS, DEFAULT_MAX_REQUEST_MINUTES, CAPTCHA_L1_MAX_LENGTH } from './constants.js';
+import { STORAGE_KEYS } from './constants.js';
+import { loadConfig, saveConfig, getConfig } from './config.js';
 
 function generateId() {
   const timestamp = Date.now().toString(36);
@@ -104,18 +105,22 @@ export async function removeTemporaryAccess(domain) {
   await storageSet({ [STORAGE_KEYS.TEMPORARY_ACCESS]: access });
 }
 
-// --- Settings ---
+// --- Settings (compatibility layer, now backed by config) ---
 
 export async function getSettings() {
-  const settings = await storageGet(STORAGE_KEYS.SETTINGS);
+  const config = await getConfig();
   return {
-    maxRequestMinutes: settings?.maxRequestMinutes ?? DEFAULT_MAX_REQUEST_MINUTES,
-    maxCaptchaLength: settings?.maxCaptchaLength ?? CAPTCHA_L1_MAX_LENGTH,
+    maxRequestMinutes: config.levels['2']?.maxMinutes ?? 120,
+    maxCaptchaLength: config.maxCaptchaLength ?? 100,
   };
 }
 
 export async function saveSettings(settings) {
-  await storageSet({ [STORAGE_KEYS.SETTINGS]: settings });
+  const config = await getConfig();
+  if (settings.maxCaptchaLength !== undefined) {
+    config.maxCaptchaLength = settings.maxCaptchaLength;
+  }
+  await saveConfig(config);
 }
 
 // --- Initialization ---
@@ -123,7 +128,6 @@ export async function saveSettings(settings) {
 export async function initializeStorage() {
   const rules = await storageGet(STORAGE_KEYS.RULES);
   const tempAccess = await storageGet(STORAGE_KEYS.TEMPORARY_ACCESS);
-  const settings = await storageGet(STORAGE_KEYS.SETTINGS);
 
   if (rules === undefined) {
     await storageSet({ [STORAGE_KEYS.RULES]: [] });
@@ -131,7 +135,25 @@ export async function initializeStorage() {
   if (tempAccess === undefined) {
     await storageSet({ [STORAGE_KEYS.TEMPORARY_ACCESS]: {} });
   }
-  if (settings === undefined) {
-    await storageSet({ [STORAGE_KEYS.SETTINGS]: { maxRequestMinutes: DEFAULT_MAX_REQUEST_MINUTES, maxCaptchaLength: CAPTCHA_L1_MAX_LENGTH } });
+
+  // Initialize config, migrating old settings if present
+  const existingConfig = await storageGet(STORAGE_KEYS.CONFIG);
+  if (existingConfig === undefined) {
+    const oldSettings = await storageGet(STORAGE_KEYS.SETTINGS);
+    await loadConfig(); // This writes DEFAULT_CONFIG if no config exists
+
+    if (oldSettings && typeof oldSettings === 'object') {
+      const config = await getConfig();
+      if (oldSettings.maxCaptchaLength !== undefined) {
+        config.maxCaptchaLength = oldSettings.maxCaptchaLength;
+      }
+      await saveConfig(config);
+      // Clean up old settings key
+      await new Promise(resolve => {
+        chrome.storage.local.remove(STORAGE_KEYS.SETTINGS, resolve);
+      });
+    }
+  } else {
+    await loadConfig();
   }
 }

@@ -317,21 +317,6 @@ button {
   flex-shrink: 0;
 }
 
-.level-0 {
-  background: #c0392b;
-  color: #fff;
-}
-
-.level-1 {
-  background: #e67e22;
-  color: #fff;
-}
-
-.level-2 {
-  background: #f1c40f;
-  color: #333;
-}
-
 .toggle-switch {
   position: relative;
   width: 36px;
@@ -416,4 +401,21 @@ button {
 
 .hidden {
   display: none;
+}
+
+.options-link-row {
+  text-align: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2c3e6d;
+}
+
+#open-options-btn {
+  color: #3498db;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+#open-options-btn:hover {
+  text-decoration: underline;
 }

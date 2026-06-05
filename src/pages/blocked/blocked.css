@@ -60,21 +60,6 @@ body {
   font-weight: 600;
 }
 
-.level-0 {
-  background: #c0392b;
-  color: #fff;
-}
-
-.level-1 {
-  background: #e67e22;
-  color: #fff;
-}
-
-.level-2 {
-  background: #f1c40f;
-  color: #333;
-}
-
 .permanent-block {
   color: #e74c3c;
   font-size: 16px;

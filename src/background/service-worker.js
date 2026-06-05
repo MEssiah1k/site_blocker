@@ -2,6 +2,7 @@ import { BLOCKED_PAGE_PATH, STORAGE_KEYS } from '../lib/constants.js';
 import { extractHost } from '../lib/domain.js';
 import { shouldBlock, cleanupExpiredAccess } from '../lib/rule-engine.js';
 import { getRules, getTemporaryAccess, initializeStorage, removeTemporaryAccess } from '../lib/storage.js';
+import { loadConfig } from '../lib/config.js';
 
 const NAVIGATION_FILTER = {
   url: [{ urlPrefix: 'http://' }, { urlPrefix: 'https://' }]
@@ -59,6 +60,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.runtime.onInstalled.addListener(async () => {
   await initializeStorage();
+  await loadConfig();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -75,4 +77,6 @@ chrome.runtime.onStartup.addListener(async () => {
       chrome.alarms.create('expire_' + domain, { when: record.expireAt });
     }
   }
+
+  await loadConfig();
 });

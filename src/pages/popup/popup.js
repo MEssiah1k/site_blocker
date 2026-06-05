@@ -1,11 +1,12 @@
 import { normalizeDomain } from '../../lib/domain.js';
-import { LEVEL_LABELS } from '../../lib/constants.js';
 import { getRules, addRule, updateRule, deleteRule, generateId, getTemporaryAccess } from '../../lib/storage.js';
 import { generateRuleCaptcha, transformRuleCaptcha } from '../../lib/captcha.js';
+import { getConfig } from '../../lib/config.js';
 
 let editingRuleId = null;
 let isUnlocked = false;
 let currentRuleCaptcha = null;
+let currentConfig = null;
 
 const unlockBtn = document.getElementById('unlock-btn');
 const unlockStatus = document.getElementById('unlock-status');
@@ -28,6 +29,62 @@ const formError = document.getElementById('form-error');
 const domainPreview = document.getElementById('domain-preview');
 const rulesContainer = document.getElementById('rules-container');
 const noRules = document.getElementById('no-rules');
+const openOptionsBtn = document.getElementById('open-options-btn');
+
+function getLevelColor(levelKey) {
+  if (currentConfig?.levels[String(levelKey)]?.color) {
+    return currentConfig.levels[String(levelKey)].color;
+  }
+  const predefined = { 0: '#c0392b', 1: '#e67e22', 2: '#f1c40f' };
+  if (predefined[levelKey]) return predefined[levelKey];
+  const hue = (parseInt(levelKey, 10) * 67) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+}
+
+function isColorDark(color) {
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length >= 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+    }
+  }
+  if (color.startsWith('hsl')) {
+    const match = color.match(/hsl\(\s*(\d+)/);
+    if (match) {
+      const hue = parseInt(match[1], 10);
+      return hue < 60 || hue > 300;
+    }
+  }
+  return false;
+}
+
+function populateLevelSelect(selectedLevel) {
+  if (!currentConfig) return;
+
+  levelSelect.innerHTML = '';
+  const levelKeys = Object.keys(currentConfig.levels).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+
+  for (const key of levelKeys) {
+    const level = currentConfig.levels[key];
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = `等级 ${key} — ${level.label}`;
+    if (key === String(selectedLevel)) {
+      option.selected = true;
+    }
+    levelSelect.appendChild(option);
+  }
+}
+
+// --- Open options page ---
+
+openOptionsBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.runtime.openOptionsPage();
+});
 
 // --- Add current site ---
 
@@ -61,8 +118,8 @@ addCurrentBtn.addEventListener('click', async () => {
 
 // --- Unlock logic ---
 
-unlockBtn.addEventListener('click', () => {
-  currentRuleCaptcha = generateRuleCaptcha();
+unlockBtn.addEventListener('click', async () => {
+  currentRuleCaptcha = await generateRuleCaptcha();
   ruleCaptchaText.textContent = currentRuleCaptcha;
   ruleCaptchaInput.value = '';
   rulePasteWarning.classList.add('hidden');
@@ -107,8 +164,10 @@ confirmUnlockBtn.addEventListener('click', () => {
   if (input !== expected && input !== '101010') {
     captchaError.textContent = '输入错误，已生成新验证码。';
     captchaError.classList.remove('hidden');
-    currentRuleCaptcha = generateRuleCaptcha();
-    ruleCaptchaText.textContent = currentRuleCaptcha;
+    generateRuleCaptcha().then(captcha => {
+      currentRuleCaptcha = captcha;
+      ruleCaptchaText.textContent = currentRuleCaptcha;
+    });
     ruleCaptchaInput.value = '';
     return;
   }
@@ -186,6 +245,11 @@ async function renderRuleList() {
       ? `<span class="countdown" data-domain="${rule.domain}">${formatCountdown(access.expireAt - now)}</span>`
       : '';
 
+    const levelConf = currentConfig?.levels[String(rule.level)];
+    const levelLabel = levelConf?.label ?? `等级 ${rule.level}`;
+    const levelColor = getLevelColor(rule.level);
+    const isDark = isColorDark(levelColor);
+
     return `
     <div class="rule-item" data-id="${rule.id}">
       <div class="rule-info">
@@ -193,7 +257,7 @@ async function renderRuleList() {
         ${rule.note ? `<div class="rule-note">${escapeHtml(rule.note)}</div>` : ''}
       </div>
       ${countdownHtml}
-      <span class="level-badge level-${rule.level}">${LEVEL_LABELS[rule.level]}</span>
+      <span class="level-badge" style="background:${levelColor};color:${isDark ? '#fff' : '#333'}">${escapeHtml(levelLabel)}</span>
       ${showControls ? `
         <label class="toggle-switch">
           <input type="checkbox" ${rule.enabled ? 'checked' : ''} data-action="toggle" data-id="${rule.id}">
@@ -244,7 +308,7 @@ rulesContainer.addEventListener('click', async (e) => {
     if (rule) {
       editingRuleId = id;
       domainInput.value = rule.domain;
-      levelSelect.value = rule.level;
+      populateLevelSelect(rule.level);
       noteInput.value = rule.note || '';
       formTitle.textContent = '编辑规则';
       cancelBtn.classList.remove('hidden');
@@ -291,6 +355,13 @@ saveBtn.addEventListener('click', async () => {
     return;
   }
 
+  // Validate level exists in config
+  if (currentConfig && !currentConfig.levels[String(level)]) {
+    formError.textContent = `等级 ${level} 不存在于当前配置中。`;
+    formError.classList.remove('hidden');
+    return;
+  }
+
   try {
     if (editingRuleId) {
       await updateRule(editingRuleId, { domain, level, note });
@@ -321,7 +392,7 @@ cancelBtn.addEventListener('click', () => {
 function clearForm() {
   editingRuleId = null;
   domainInput.value = '';
-  levelSelect.value = '1';
+  populateLevelSelect(1);
   noteInput.value = '';
   formTitle.textContent = '添加规则';
   cancelBtn.classList.add('hidden');
@@ -329,11 +400,28 @@ function clearForm() {
   domainPreview.textContent = '';
 }
 
-renderRuleList();
+// --- Initialize ---
+
+async function init() {
+  currentConfig = await getConfig();
+  populateLevelSelect(1);
+  await renderRuleList();
+}
+
+init();
 
 // Refresh when storage changes (e.g. temp access granted from blocked page)
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && (changes.temporaryAccess || changes.rules)) {
-    renderRuleList();
+  if (area === 'local') {
+    if (changes.temporaryAccess || changes.rules) {
+      renderRuleList();
+    }
+    if (changes.config) {
+      getConfig().then(config => {
+        currentConfig = config;
+        populateLevelSelect(parseInt(levelSelect.value, 10) || undefined);
+        renderRuleList();
+      });
+    }
   }
 });
